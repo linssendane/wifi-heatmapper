@@ -3,8 +3,8 @@ import { IperfCommands } from "./types";
 export const defaultIperfCommands: IperfCommands = {
   tcpDownload: "iperf3 -c {server} {port} -t {duration} -R -J",
   tcpUpload: "iperf3 -c {server} {port} -t {duration} -J",
-  udpDownload: "iperf3 -c {server} {port} -t {duration} -R -u -b 100M -J",
-  udpUpload: "iperf3 -c {server} {port} -t {duration} -u -b 100M -J",
+  udpDownload: "iperf3 -c {server} {port} -t 5 -R -u -b 100M -J",
+  udpUpload: "iperf3 -c {server} {port} -t 5 -u -b 100M -J",
 };
 
 export function buildIperfCommand(
