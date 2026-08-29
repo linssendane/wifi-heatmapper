@@ -7,7 +7,8 @@
   "Authentication": "security",
   "Transmit rate (Mbps)": "txRate",
   "Radio type": "phyMode",
-  "Name": "name"
+  "Name": "name",
+  "State": "state"
 }
 
 // Output from netsh wlan show interfaces on Win 11 English (US)
