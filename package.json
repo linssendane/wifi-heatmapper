@@ -64,5 +64,9 @@
   "overrides": {
     "@types/react": "19.1.6",
     "@types/react-dom": "19.1.6"
+  },
+  "allowScripts": {
+    "esbuild@0.25.5": true,
+    "sharp@0.34.4": true
   }
 }
