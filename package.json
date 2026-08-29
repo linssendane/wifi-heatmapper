@@ -13,6 +13,7 @@
     "check": "eslint src __tests__"
   },
   "dependencies": {
+    "@duckdb/node-api": "^1.5.5-r.4",
     "@radix-ui/colors": "^3.0.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",

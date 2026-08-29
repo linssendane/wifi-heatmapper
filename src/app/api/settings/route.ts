@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readFile, writeFile, mkdir, readdir, copyFile } from "fs/promises";
 import path from "path";
 import { sanitizeFilename } from "@/lib/utils";
+import { recordSurveyState } from "@/lib/surveyLedger";
 
 const SURVEYS_DIR = path.join(process.cwd(), "data", "surveys");
 
@@ -126,6 +127,13 @@ export async function POST(request: NextRequest) {
     }
 
     await writeFile(filePath, JSON.stringify(safeSettings, null, 2));
+
+    // Append-only mirror. The JSON above is app state the client can clobber;
+    // this is the durable record. Never throws - see surveyLedger.
+    await recordSurveyState(
+      settings.floorplanImageName,
+      safeSettings.surveyPoints ?? [],
+    );
 
     return NextResponse.json({ status: "success", path: filePath });
   } catch (err) {
