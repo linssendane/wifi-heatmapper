@@ -5,7 +5,7 @@
  * GET /api/settings?list=true - lists all available survey files
  */
 import { NextRequest, NextResponse } from "next/server";
-import { readFile, writeFile, mkdir, readdir } from "fs/promises";
+import { readFile, writeFile, mkdir, readdir, copyFile } from "fs/promises";
 import path from "path";
 import { sanitizeFilename } from "@/lib/utils";
 
@@ -82,6 +82,49 @@ export async function POST(request: NextRequest) {
     const { sudoerPassword: _, ...safeSettings } = settings;
 
     const filePath = getSurveyPath(settings.floorplanImageName);
+
+    // Guard against data loss.
+    //
+    // The client keeps settings in React state and calls updateSettings() ->
+    // writeSettingsToFile() on every partial change. On mount that state starts
+    // as getDefaults("") with an empty surveyPoints array, and the floorplan is
+    // only loaded afterwards by an effect. Any write that lands in that window
+    // carries the *previous* floorplanImageName together with *empty* points,
+    // which silently truncates a completed survey. Switching floorplans in the
+    // media dropdown hits the same race.
+    //
+    // The client cannot be trusted to have loaded the file it is overwriting,
+    // so enforce it here, at the only chokepoint every write passes through.
+    const incomingPoints = Array.isArray(safeSettings.surveyPoints)
+      ? safeSettings.surveyPoints.length
+      : 0;
+    let existingPoints = 0;
+    try {
+      const previous = JSON.parse(await readFile(filePath, "utf-8"));
+      existingPoints = Array.isArray(previous.surveyPoints)
+        ? previous.surveyPoints.length
+        : 0;
+    } catch {
+      // no existing survey file - nothing to protect
+    }
+
+    if (existingPoints > 0 && incomingPoints === 0) {
+      return NextResponse.json(
+        {
+          error:
+            `Refusing to overwrite ${existingPoints} recorded survey point(s) ` +
+            `with an empty survey. Reload the page and re-select the floorplan.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    // Any other shrink is legitimate (deleting a point), but keep a copy anyway.
+    if (existingPoints > incomingPoints) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      await copyFile(filePath, `${filePath}.${stamp}.bak`);
+    }
+
     await writeFile(filePath, JSON.stringify(safeSettings, null, 2));
 
     return NextResponse.json({ status: "success", path: filePath });
