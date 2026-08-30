@@ -40,6 +40,7 @@ next-env.d.ts
 /data/surveys/*.duckdb
 /data/surveys/*.duckdb.wal
 /data/surveys/*.bak
+/data/surveys/*.tmp
 /data/surveys-*/
 public/media/
 

@@ -128,8 +128,43 @@ async function open(): Promise<{
   return { instance, connection };
 }
 
+type LedgerCounts = { inserted: number; updated: number; deleted: number };
+
 /**
- * recordSurveyState() - reconcile one survey's points against the ledger and
+ * Serialize every ledger write, process-wide.
+ *
+ * DuckDB takes an exclusive lock on the database file, and this module opens it
+ * per write so the file is never held locked between calls. Two concurrent
+ * writers therefore collide: the second open fails, and since ledger errors are
+ * deliberately swallowed the measurement is dropped with only a log line. That
+ * is exactly how Point_9 was lost on 2026-08-30 - it was written at the same
+ * moment as Point_8 and never reached the ledger.
+ *
+ * The lock in api/settings/route.ts is per survey file and does not help here:
+ * the ledger is a single file shared by every survey. This queue is the one
+ * that matters, so keep it module-global.
+ */
+let ledgerQueue: Promise<unknown> = Promise.resolve();
+
+function serialize<T>(fn: () => Promise<T>): Promise<T> {
+  const next = ledgerQueue.then(fn, fn);
+  ledgerQueue = next.catch(() => undefined);
+  return next;
+}
+
+/**
+ * recordSurveyState() - append any change to a survey's points to the ledger.
+ * Serialized against every other ledger write; never throws.
+ */
+export function recordSurveyState(
+  survey: string,
+  points: AnyPoint[],
+): Promise<LedgerCounts> {
+  return serialize(() => recordSurveyStateUnlocked(survey, points));
+}
+
+/**
+ * recordSurveyStateUnlocked() - reconcile one survey's points against the ledger and
  * append an event for anything that changed.
  *
  * Called on every settings write. Never throws: the ledger is a safety net, and
@@ -139,10 +174,10 @@ async function open(): Promise<{
  * @param points - the client's current surveyPoints array
  * @returns counts of appended events
  */
-export async function recordSurveyState(
+async function recordSurveyStateUnlocked(
   survey: string,
   points: AnyPoint[],
-): Promise<{ inserted: number; updated: number; deleted: number }> {
+): Promise<LedgerCounts> {
   const result = { inserted: 0, updated: 0, deleted: 0 };
   if (!survey) return result;
 
