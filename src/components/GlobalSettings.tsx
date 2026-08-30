@@ -108,8 +108,25 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
       // Load settings for current floorplan
       const floorPlanToLoad = floorplanImage || defaultFloorPlan;
-      const newHeatmapSettings: HeatmapSettings | null =
-        await readSettingsFromFile(floorPlanToLoad);
+
+      let newHeatmapSettings: HeatmapSettings | null;
+      try {
+        newHeatmapSettings = await readSettingsFromFile(floorPlanToLoad);
+      } catch (err) {
+        // The read failed, so we do not know what is on disk. Keep the current
+        // state and leave the file alone: falling through would write empty
+        // defaults over a recorded survey.
+        console.error(
+          `[wifi-heatmapper] Could not load "${floorPlanToLoad}", keeping current settings:`,
+          err,
+        );
+        toast({
+          title: "Could not load survey",
+          description: `Failed to read "${floorPlanToLoad}". Your saved data is untouched - reload the page to try again.`,
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Merge with defaults to ensure all fields exist (handles old/incomplete files)
       const defaults = getDefaults(floorPlanToLoad);

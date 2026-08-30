@@ -31,8 +31,13 @@ export async function readSettingsFromFile(
     }
 
     if (!response.ok) {
-      console.error("Error reading settings:", await response.text());
-      return null;
+      // Do NOT return null here. null means "this survey does not exist yet",
+      // which licenses the caller to create it from defaults. A failed read
+      // tells us nothing about what is on disk, and treating it as absence
+      // overwrites a recorded survey with an empty one.
+      throw new Error(
+        `Failed to read settings for "${fileName}": ${response.status} ${await response.text()}`,
+      );
     }
 
     const parsedData = await response.json();
@@ -48,8 +53,9 @@ export async function readSettingsFromFile(
 
     return parsedData;
   } catch (error) {
+    // Same reasoning: propagate, never degrade a failure into "absent".
     console.error("Error reading settings:", error);
-    return null;
+    throw error;
   }
 }
 
